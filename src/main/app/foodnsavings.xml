@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="foodnsavingsFlow">
+        <dw:transform-message doc:name="Generate payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((giftcard) -> {
+	balance: giftcard.amount_granted,
+	createdOn: now as :datetime,
+	number: giftcard.card_no,
+	sourceID: "MULEBANK-0949"
+} as :object {class: "com.mulesoft.training.model.Giftcard"}
+)]]></dw:set-payload>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#['${env}'  == 'prod']">
+                <db:insert config-ref="Derby_Database_Configuration" bulkMode="true" doc:name="Prod DB">
+                    <db:parameterized-query><![CDATA[INSERT INTO Giftcards (number, sourceID, balance, createdOn) VALUES
+(#[payload.number], #[payload.sourceID], #[payload.balance], #[payload.createdOn])]]></db:parameterized-query>
+                </db:insert>
+            </when>
+            <otherwise>
+                <db:insert config-ref="Derby_Database_Configuration" bulkMode="true" doc:name="Test DB">
+                    <db:parameterized-query><![CDATA[INSERT INTO Giftcards (number, sourceID, balance, createdOn) VALUES
+(#[payload.number], #[payload.sourceID], #[payload.balance], #[payload.createdOn])]]></db:parameterized-query>
+                </db:insert>
+            </otherwise>
+        </choice>
+        <logger message="#[&quot;\n\n\nFOOD AND SAVINGS COMPLETED\n\n\n&quot;]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

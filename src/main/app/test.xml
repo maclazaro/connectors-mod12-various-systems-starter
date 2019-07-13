@@ -20,7 +20,7 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
     -->
     <ftp:connector name="FTPTest" fileAge="1" pollingFrequency="60000" validateConnections="true" moveToDirectory="processed" doc:name="FTP"/>
 
-    <flow name="testFTP" initialState="started">
+    <flow name="testFTP" initialState="stopped">
         <ftp:inbound-endpoint host="${partner2.ftp.host}" port="${partner2.ftp.port}" user="${partner2.ftp.username}" password="${partner2.ftp.password}" connector-ref="FTPTest" responseTimeout="10000" doc:name="FTP" path="/data/test/"/>
         <dw:transform-message doc:name="Transform Message">
             <dw:set-payload><![CDATA[%dw 1.0
@@ -32,7 +32,7 @@ payload]]></dw:set-payload>
         
     </flow>
 
-    <flow name="testDB" initialState="started">
+    <flow name="testDB" initialState="stopped">
         <poll doc:name="Poll">
             <fixed-frequency-scheduler frequency="120000" startDelay="5000"/>
             <db:select config-ref="Derby_Database_Configuration" doc:name="Database">

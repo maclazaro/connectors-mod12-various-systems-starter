@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+    <flow name="oneretailplusFlow">
+        <dw:transform-message doc:name="Generate payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((giftcard) ->
+	{
+	  cardNo: giftcard.card_no,
+      amount: giftcard.amount_granted,
+	  bankOriginationID: "MULEBANK-0949"
+	}
+)]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="recordCount" value="#[payload.size()]" doc:name="recordCount"/>
+        <dw:transform-message doc:name="Convert to CSV">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <jms:outbound-endpoint queue="oretailplus" connector-ref="Active_MQ_Local" doc:name="JMS"/>
+        <file:outbound-endpoint path="${master.fileWrite}" outputPattern="MULEBANK-One-Retail-Plus-#[server.dateTime.toXMLCalendar().toGregorianCalendar().getTimeInMillis()]-#[flowVars.recordCount].csv" responseTimeout="10000" doc:name="File"/>
+        <logger message="#[&quot;\n\n\nONE RETAIL PLUS COMPLETED\n\n\n&quot;]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

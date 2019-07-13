@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:ftp="http://www.mulesoft.org/schema/mule/ee/ftp" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/ftp http://www.mulesoft.org/schema/mule/ee/ftp/current/mule-ftp-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="mealsngoFlow">
+        <set-variable variableName="creationDate" value="#[server.dateTime]" doc:name="creationDate"/>
+        <dw:transform-message doc:name="Generate payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((giftcard) ->
+	{
+      gc_balance: giftcard.amount_granted,
+	  gc_card_number: giftcard.card_no,
+	  origin: "MULEBANK-0949",
+	  card_type: "VISA",
+	  expiration: (flowVars.creationDate + |P3M|) as :number
+	}
+)]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="creationDateUnixEpoch" value="#[flowVars.creationDate.toXMLCalendar().toGregorianCalendar().getTimeInMillis()]" doc:name="creationDateUnixEpoch"/>
+        <dw:transform-message doc:name="Convert to CSV">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <ftp:outbound-endpoint host="${partner2.ftp.host}" port="${partner2.ftp.port}" path="${partner2.ftp.root}" user="${partner2.ftp.username}" password="${partner2.ftp.password}" passive="true" outputPattern="MULEBANK-gc-#[message.inboundProperties.creationDateUnixEpoch].csv" responseTimeout="10000" doc:name="FTP"/>
+        <logger message="#[&quot;\n\n\nMEALS AND GO COMPLETED\n\n\n&quot;]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>
