@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:ftp="http://www.mulesoft.org/schema/mule/ee/ftp"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/ftp http://www.mulesoft.org/schema/mule/ee/ftp/current/mule-ftp-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    
+    <!-- Test flows for the in-memory Derby Database and FTP Server. These flows are automatically run upon app startup in order to 
+         notify the user that the in-memory servers have started up and are ready to be used for development.
+    -->
+    <ftp:connector name="FTPTest" fileAge="1" pollingFrequency="60000" validateConnections="true" moveToDirectory="processed" doc:name="FTP"/>
+
+    <flow name="testFTP" initialState="started">
+        <ftp:inbound-endpoint host="${partner2.ftp.host}" port="${partner2.ftp.port}" user="${partner2.ftp.username}" password="${partner2.ftp.password}" connector-ref="FTPTest" responseTimeout="10000" doc:name="FTP" path="/data/test/"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[&quot;Test file from FTP In-Memory Server :\n&quot; + message.payload]" level="INFO" doc:name="Log Payload"/>
+        
+    </flow>
+
+    <flow name="testDB" initialState="started">
+        <poll doc:name="Poll">
+            <fixed-frequency-scheduler frequency="120000" startDelay="5000"/>
+            <db:select config-ref="Derby_Database_Configuration" doc:name="Database">
+                <db:parameterized-query><![CDATA[SELECT * FROM Giftcards WHERE number LIKE 'SAMPLE%']]></db:parameterized-query>
+            </db:select>
+        </poll>
+        <dw:transform-message doc:name="Output to JSON" metadata:id="4667896a-eb65-4fa3-9587-4deeef578ebb">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[&quot;Test Payload from Derby In-Memory Database:\n&quot; + message.payload]" level="INFO" doc:name="Log Payload"/>
+    </flow>
+
+
+
+
+
+
+
+</mule>
