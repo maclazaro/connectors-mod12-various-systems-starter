@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db"
 	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ftp="http://www.mulesoft.org/schema/mule/ee/ftp" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
 	xmlns:spring="http://www.springframework.org/schema/beans" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -11,7 +11,8 @@ http://www.mulesoft.org/schema/mule/ee/ftp http://www.mulesoft.org/schema/mule/e
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
 http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
-http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
     <flow name="processVisaGiftCards">
         <file:inbound-endpoint path="${master.fileIn}" moveToDirectory="${master.fileProcessed}" responseTimeout="10000" doc:name="File">
             <file:filename-regex-filter pattern=".*csv" caseSensitive="false"/>
@@ -22,19 +23,27 @@ http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/fil
 ---
 payload]]></dw:set-payload>
         </dw:transform-message>
+        <set-variable variableName="recordCount" value="#[payload.size()]" doc:name="recordCount"/>
+        <set-variable variableName="partner" value="#[message.payload[0].partner]" doc:name="partner"/>
         <choice doc:name="Choice">
-            <when expression="#[payload[0].partner == 'Food and Savings']">
-                <flow-ref name="foodnsavingsFlow" doc:name="foodnsavingsFlow"/>
+            <when expression="#[flowVars.partner == '${partner1}']">
+                <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                <jms:outbound-endpoint queue="${partner1.queue}" connector-ref="Active_MQ_Local" doc:name="foodnsavingsFlow" exchange-pattern="request-response"/>
             </when>
-            <when expression="#[payload[0].partner == 'Meals n Go']">
-                <flow-ref name="mealsngoFlow" doc:name="mealsngoFlow"/>
+            <when expression="#[flowVars.partner == '${partner2}']">
+                <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                <jms:outbound-endpoint queue="${partner2.queue}" connector-ref="Active_MQ_Local" doc:name="mealsngoFlow" exchange-pattern="request-response"/>
             </when>
-            <when expression="#[payload[0].partner == 'Online Retail Plus']">
-                <flow-ref name="oneretailplusFlow" doc:name="oneretailplusFlow"/>
+            <when expression="#[flowVars.partner == '${partner3}']">
+                <object-to-byte-array-transformer doc:name="Object to Byte Array"/>
+                <jms:outbound-endpoint queue="${partner3.queue}" connector-ref="Active_MQ_Local" doc:name="oneretailplusFlow" exchange-pattern="request-response"/>
             </when>
             <otherwise>
-                <logger level="INFO" doc:name="Logger"/>
+                <logger level="INFO" doc:name="Logger" message="#[&quot;\n\n\nPROVIDED PARTNER NOT VALID\n\n\n&quot;]"/>
             </otherwise>
         </choice>
+        <set-payload value="Processed #[flowVars.recordCount] gift cards for #[flowVars.partner] with status: #[message.inboundProperties.jmsStatusMessage]" doc:name="Set Payload"/>
+        <set-variable variableName="datetimeFormatted" value="#[server.dateTime.format(&quot;yyyy-MM-dd-hh_mm_ss&quot;)]" doc:name="datetimeFormatted"/>
+        <file:outbound-endpoint path="${master.fileWrite}" outputPattern="#[flowVars.partner]-gc-report-#[flowVars.dateTimeFormatted].txt" responseTimeout="10000" doc:name="File"/>
     </flow>
 </mule>

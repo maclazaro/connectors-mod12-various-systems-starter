@@ -9,6 +9,8 @@ http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/
 http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
 http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
     <flow name="oneretailplusFlow">
+        <jms:inbound-endpoint queue="${partner3.queue}" connector-ref="Active_MQ_Local" doc:name="JMS" exchange-pattern="request-response"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
         <dw:transform-message doc:name="Generate payload">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
@@ -21,7 +23,6 @@ payload map ((giftcard) ->
 	}
 )]]></dw:set-payload>
         </dw:transform-message>
-        <set-variable variableName="recordCount" value="#[payload.size()]" doc:name="recordCount"/>
         <dw:transform-message doc:name="Convert to CSV">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/csv
@@ -30,6 +31,10 @@ payload]]></dw:set-payload>
         </dw:transform-message>
         <jms:outbound-endpoint queue="oretailplus" connector-ref="Active_MQ_Local" doc:name="JMS"/>
         <file:outbound-endpoint path="${master.fileWrite}" outputPattern="MULEBANK-One-Retail-Plus-#[server.dateTime.toXMLCalendar().toGregorianCalendar().getTimeInMillis()]-#[flowVars.recordCount].csv" responseTimeout="10000" doc:name="File"/>
+        <set-property propertyName="jmsStatusMessage" value="SUCCESS" doc:name="jmsStatusMessage"/>
         <logger message="#[&quot;\n\n\nONE RETAIL PLUS COMPLETED\n\n\n&quot;]" level="INFO" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-property propertyName="jmsStatusMessage" value="FAILED" doc:name="jmsStatusMessage"/>
+        </catch-exception-strategy>
     </flow>
 </mule>
